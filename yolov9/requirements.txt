@@ -1,0 +1,4 @@
+roboflow
+jupyter
+jupyter_contrib_nbextensions
+pickleshare

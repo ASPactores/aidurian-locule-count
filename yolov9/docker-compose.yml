@@ -1,0 +1,20 @@
+services:
+  app:
+    build: .
+    container_name: yolo_docker_test
+    command: jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/app
+      - ./datasets:/datasets
+      - ./ultralytics_files/runs:/ultralytics/runs
+      - ./ultralytics_files/weights:/ultralytics/weights
+    stdin_open: true  # -i
+    tty: true         # -t
+    ipc: host         # --ipc=host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]  # --gpus all

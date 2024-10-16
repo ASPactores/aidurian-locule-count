@@ -1,0 +1,16 @@
+numpy==1.21.5
+scipy==1.7.3
+Pillow
+cython
+matplotlib==3.5.3
+scikit-image==0.16.2
+tensorflow==2.0.0
+tensorflow-estimator==2.0.0
+keras==2.2.4
+opencv
+h5py==2.10.0
+imgaug
+IPython[all]
+jupyter
+nbconvert
+mistune
