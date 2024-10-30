@@ -2,7 +2,7 @@ services:
   app:
     build: .
     container_name: mask_rcnn_durian_locule_counting
-    # command: /bin/bash -c "jupyter notebook --ip=0.0.0.0 --port=9999 --no-browser --allow-root"
+    command: /bin/bash -c "jupyter notebook --ip=0.0.0.0 --port=9999 --no-browser --allow-root"
     ports:
       - "9999:9999"
     volumes:
