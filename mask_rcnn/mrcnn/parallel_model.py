@@ -14,9 +14,9 @@ https://github.com/fchollet/keras/blob/master/keras/utils/training_utils.py
 """
 
 import tensorflow as tf
-import tensorflow.python.keras.backend as K
-import tensorflow.python.keras.layers as KL
-import tensorflow.python.keras.models as KM
+import tensorflow.keras.backend as K
+import tensorflow.keras.layers as KL
+import tensorflow.keras.models as KM
 
 
 class ParallelModel(KM.Model):
@@ -26,17 +26,19 @@ class ParallelModel(KM.Model):
     merges the outputs together and applies the loss on the combined
     outputs.
     """
-
+        
     def __init__(self, keras_model, gpu_count):
         """Class constructor.
         keras_model: The Keras model to parallelize
         gpu_count: Number of GPUs. Must be > 1
         """
+        
         self.inner_model = keras_model
         self.gpu_count = gpu_count
         merged_outputs = self.make_parallel()
         super(ParallelModel, self).__init__(inputs=self.inner_model.inputs,
                                             outputs=merged_outputs)
+        
 
     def __getattribute__(self, attrname):
         """Redirect loading and saving methods to the inner model. That's where
@@ -113,9 +115,10 @@ if __name__ == "__main__":
 
     import os
     import numpy as np
-    import keras.optimizers
-    from keras.datasets import mnist
-    from keras.preprocessing.image import ImageDataGenerator
+    import tensorflow.keras.optimizers
+    from tensorflow.keras.datasets import mnist
+    from tensorflow.keras.preprocessing.image import ImageDataGenerator
+    from tensorflow import keras
 
     GPU_COUNT = 2
 
