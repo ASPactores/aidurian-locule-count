@@ -22,6 +22,8 @@ import tensorflow.keras.utils as KU
 from tensorflow.python.eager import context
 import tensorflow.keras.models as KM
 
+import numpy as np
+
 # import tensorflow.keras.engine as KE
 
 
