@@ -1,112 +1,159 @@
-from typing import Tuple
-
 import numpy as np
-from mrcnn.utils import compute_ap, compute_ap_range, get_iou
-from mrcnn import model as modellib
 import matplotlib.pyplot as plt
+from mrcnn import utils
+from mrcnn.utils import get_iou
+from mrcnn import model as modellib
 
 
-def compute_performance(
-    image_ids, dataset, config, model
-) -> Tuple[float, float, float, float]:
-    ap_50_arr = []
-    ap_75_arr = []
-    map_arr = []
+def compute_performance_metrics(
+    image_ids, test_model, dataset_test, test_config, iou_thresholds=[0.50, 0.75]
+):
+    """
+    Computes performance metrics (AP at IoU=0.50, AP at IoU=0.75, mean AP, and IoU)
+    for the given image IDs.
 
-    iou_arr = []
+    Args:
+        image_ids: List of image IDs to evaluate.
+        iou_thresholds: List of IoU thresholds for AP calculation (e.g., [0.50, 0.75]).
+
+    Returns:
+        A dictionary containing:
+            - AP_50: List of APs for IoU=0.50
+            - AP_75: List of APs for IoU=0.75
+            - mAP: List of mean APs (average across thresholds)
+            - IOUs: List of IoUs for each ground truth bounding box
+            - image_data: Data needed for visualization, structured as:
+                          {image_id: [(image, gt_box, best_pred_box), ...]}
+    """
+    AP_50 = []
+    AP_75 = []
+    mAPs = []
+    IOUs = []
     image_data = {}
-    selected_image_ids = np.random.choice(image_ids, 2)  # Select 2 random image IDs
 
     for image_id in image_ids:
-        # Load image
-        image, _, gt_class_id, gt_bbox, gt_mask = modellib.load_image_gt(
-            dataset, config, image_id
+        # Load image and ground truth data
+        image, image_meta, gt_class_id, gt_bbox, gt_mask = modellib.load_image_gt(
+            dataset_test, test_config, image_id
         )
 
         # Run object detection
-        results = model.detect([image], verbose=0)
+        results = test_model.detect([image], verbose=0)
         r = results[0]
 
-        print(type(ap_50_arr))
-        # Compute AP@0.50
-        ap_50, _, _, _ = compute_ap(
-            gt_bbox,
-            gt_class_id,
-            gt_mask,
-            r["rois"],
-            r["class_ids"],
-            r["scores"],
-            r["masks"],
-            iou_threshold=0.50,
+        # Compute AP for IoU thresholds 0.50 and 0.75
+        AP_50.append(
+            utils.compute_ap(
+                gt_bbox,
+                gt_class_id,
+                gt_mask,
+                r["rois"],
+                r["class_ids"],
+                r["scores"],
+                r["masks"],
+                iou_threshold=0.50,
+            )[0]
         )
-        print(type(ap_50))
-        print(ap_50)
-        print(ap_50_arr)
-        ap_50_arr.append(ap_50)
-
-        # Compute AP@0.75
-        ap_75, _, _, _ = compute_ap(
-            gt_bbox,
-            gt_class_id,
-            gt_mask,
-            r["rois"],
-            r["class_ids"],
-            r["scores"],
-            r["masks"],
-            iou_threshold=0.75,
+        AP_75.append(
+            utils.compute_ap(
+                gt_bbox,
+                gt_class_id,
+                gt_mask,
+                r["rois"],
+                r["class_ids"],
+                r["scores"],
+                r["masks"],
+                iou_threshold=0.75,
+            )[0]
         )
-        ap_75_arr.append(ap_75)
 
-        # Compute mAP
-        map_val = compute_ap_range(
-            gt_bbox,
-            gt_class_id,
-            gt_mask,
-            r["rois"],
-            r["class_ids"],
-            r["scores"],
-            r["masks"],
-            verbose=0,
+        # Compute mean AP across thresholds (using utils.compute_ap_range if available)
+        mAPs.append(
+            utils.compute_ap_range(
+                gt_bbox,
+                gt_class_id,
+                gt_mask,
+                r["rois"],
+                r["class_ids"],
+                r["scores"],
+                r["masks"],
+                verbose=0,
+            )
         )
-        map_arr.append(map_val)
 
-        # Compute IOU for each bounding box
+        # Prepare bounding boxes for IoU computation and visualization
         bounding_boxes = []
-
         for gt_box in gt_bbox:
-            gt_y0, gt_x1, gt_y2, gt_x2 = gt_box
             best_iou = -1
             best_pred_box = None
-
-            # Find the predicted box with the highest IoU for this ground truth box
             for pred_box in r["rois"]:
-                pred_y0, pred_x1, pred_y2, pred_x2 = pred_box
                 iou = get_iou(
-                    [gt_x1, gt_y0, gt_x2, gt_y2], [pred_x1, pred_y0, pred_x2, pred_y2]
+                    [gt_box[1], gt_box[0], gt_box[3], gt_box[2]],
+                    [pred_box[1], pred_box[0], pred_box[3], pred_box[2]],
                 )
-
                 if iou > best_iou:
                     best_iou = iou
                     best_pred_box = pred_box
-
-            iou_arr.append(best_iou)
+            IOUs.append(best_iou)
             bounding_boxes.append((image, gt_box, best_pred_box))
 
-        # Store the bounding boxes for the current image_id if it's selected
-        if image_id in selected_image_ids:
-            image_data.setdefault(image_id, []).extend(bounding_boxes)
+        # Store bounding boxes for visualization
+        image_data[image_id] = bounding_boxes
 
-    # Display all images in a grid
-    display_bounding_boxes(image_data)
-
-    return np.mean(ap_50_arr), np.mean(ap_75_arr), np.mean(map_arr), np.mean(iou_arr)
+    # Collect results in a dictionary
+    metrics = {
+        "AP_50": np.mean(AP_50),
+        "AP_75": np.mean(AP_75),
+        "mAP": np.mean(mAPs),
+        "IOUs": np.mean(IOUs),
+        "image_data": image_data,
+    }
+    return metrics
 
 
 """
-==========================
-Visualizing Bounding Boxes
-==========================
+================
+Visualize Results
+================
 """
+
+
+def display_bounding_boxes(image_data, maximum_images=3):
+    """
+    Display images with their ground truth and predicted bounding boxes in a grid layout.
+
+    Args:
+        image_data: A dictionary where keys are image IDs and values are lists of tuples
+                    containing (image, gt_box, best_pred_box).
+    """
+    max_columns = 6  # Maximum number of columns
+    selected_image_ids = np.random.choice(
+        list(image_data.keys()), maximum_images, replace=False
+    )
+
+    # Create a new dictionary with the selected items
+    selected_images = {
+        image_id: image_data[image_id] for image_id in selected_image_ids
+    }
+    image_data = selected_images
+
+    rows = len(image_data)  # Number of unique image IDs
+    grid_size = (rows, max_columns)  # Grid size (rows, columns)
+
+    fig, axes = plt.subplots(*grid_size, figsize=(15, 5 * rows))
+    axes = axes.flatten()  # Flatten the grid for easy iteration
+
+    for idx, (image_id, bounding_boxes) in enumerate(image_data.items()):
+        for col in range(max_columns):
+            ax = axes[idx * max_columns + col]
+            if col < len(bounding_boxes):
+                image, gt_box, best_pred_box = bounding_boxes[col]
+                draw_bounding_boxes(ax, image, gt_box, best_pred_box, image_id)
+            else:
+                ax.axis("off")  # Hide axes if no image available
+
+    plt.tight_layout(pad=0.5, h_pad=0.5)  # Adjust layout
+    plt.show()
 
 
 def draw_bounding_boxes(ax, image, gt_box, best_pred_box, image_id):
@@ -152,31 +199,3 @@ def draw_bounding_boxes(ax, image, gt_box, best_pred_box, image_id):
         )
 
     ax.set_title(f"Image ID: {image_id}")
-
-
-def display_bounding_boxes(image_data):
-    """
-    Display images with their ground truth and predicted bounding boxes in a grid layout.
-
-    Args:
-        image_data: A dictionary where keys are image IDs and values are lists of tuples
-                    containing (image, gt_box, best_pred_box).
-    """
-    max_columns = 6  # Maximum number of columns
-    rows = len(image_data)  # Number of unique image IDs
-    grid_size = (rows, max_columns)  # Grid size (rows, columns)
-
-    fig, axes = plt.subplots(*grid_size, figsize=(15, 5 * rows))
-    axes = axes.flatten()  # Flatten the grid for easy iteration
-
-    for idx, (image_id, bounding_boxes) in enumerate(image_data.items()):
-        for col in range(max_columns):
-            ax = axes[idx * max_columns + col]
-            if col < len(bounding_boxes):
-                image, gt_box, best_pred_box = bounding_boxes[col]
-                draw_bounding_boxes(ax, image, gt_box, best_pred_box, image_id)
-            else:
-                ax.axis("off")  # Hide axes if no image available
-
-    plt.tight_layout(pad=0.5, h_pad=0.5)  # Adjust layout
-    plt.show()
